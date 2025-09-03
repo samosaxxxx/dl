@@ -1,0 +1,302 @@
+1 - ADAGRAD OPTIMIZER
+import numpy as np
+# Define the function and its gradients
+def f(x, y):
+    return x**2 + y**2
+def grad_f(x, y):
+    return np.array([2 * x, 2 * y])
+# Parameters
+eta = 0.1  # Learning rate
+epsilon = 1e-8  # Convergence threshold
+x = -0.1659  # Initial x
+y = 0.4406   # Initial y
+bounds = [-1, 1]  # Bounds for x and y
+# Initialize sum of squared gradients
+sum_sq_grad = np.array([0.0, 0.0])
+# Iteration counter
+iteration = 0
+max_iterations = 10000  # Safety limit
+while True:
+    # Compute gradients
+    grad = grad_f(x, y)
+    # Update sum of squared gradients
+    sum_sq_grad += grad**2
+    # Compute adaptive learning rate
+    adaptive_lr = eta / (np.sqrt(sum_sq_grad) + epsilon)
+    # Update parameters
+    x -= adaptive_lr[0] * grad[0]
+    y -= adaptive_lr[1] * grad[1]
+    # Enforce bounds
+    x = np.clip(x, bounds[0], bounds[1])
+    y = np.clip(y, bounds[0], bounds[1])
+    # Increment iteration
+    iteration += 1
+    # Print progress at each iteration
+    print(f"Iteration {iteration}: x = {x:.8f}, y = {y:.8f}, f(x, y) = {f(x, y):.8f}")
+    # Check convergence
+    if np.linalg.norm(grad) < epsilon or iteration >= max_iterations:
+        break
+# Output results
+print(f"\nFinal x: {x:.8f}, y: {y:.8f}")
+print(f"Function value: {f(x, y):.8f}")
+print(f"Total Iterations: {iteration}")
+
+2 - MOMENTUM GRADIENT
+import numpy as np
+# The objective function
+def objective(x, y):
+    return x**2.0 + y**2.0
+# The derivative of the objective function
+def derivative(x, y):
+    return np.array([x * 2.0, y * 2.0])
+# Gradient descent algorithm with momentum
+def momentum_gradient_descent(objective, derivative, bounds, n_iter, learning_rate, momentum):
+    # Generate an initial point
+    solution = bounds[:, 0] + np.random.rand(len(bounds)) * (bounds[:, 1] - bounds[:, 0])
+    # Initialize the change vector
+    change = 0.0
+    # Run the gradient descent
+    for i in range(n_iter):
+        # Calculate the gradient
+        gradient = derivative(solution[0], solution[1])
+        # Calculate the new change vector
+        new_change = learning_rate * gradient + momentum * change
+        # Update the solution
+        solution = solution - new_change
+        # Store the new change
+        change = new_change
+        # Evaluate the candidate point
+        solution_eval = objective(solution[0], solution[1])
+        # Report progress
+        print('>%d f(%s) = %.5f' % (i, solution, solution_eval))
+    return [solution, solution_eval]
+# Seed the pseudo-random number generator
+np.random.seed(1)
+# Define the range for input
+bounds = np.asarray([[-1.0, 1.0], [-1.0, 1.0]])
+# Define the total iterations
+n_iter = 30
+# Define the learning rate
+learning_rate = 0.1
+# Define the momentum
+momentum = 0.3
+# Perform the gradient descent search with momentum
+best, score = momentum_gradient_descent(objective, derivative, bounds, n_iter, learning_rate, momentum)
+print('Done!')
+print('f(%s) = %f' % (best, score))
+
+3 - ADAM OPTIMIZER
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
+import numpy as np
+# Generate some sample data
+X = np.array([-1, 0, 1, 2, 3, 4], dtype=float)
+Y = np.array([-3, -1, 1, 3, 5, 7], dtype=float)
+# Create a simple sequential model
+model = Sequential()
+model.add(Dense(1, input_dim=1))
+# Compile the model with the Adam optimizer
+# The learning rate can be tuned
+adam = Adam(learning_rate=0.1)
+model.compile(loss='mean_squared_error', optimizer=adam)
+# Train the model
+model.fit(X, Y, epochs=100, verbose=0)
+# Make predictions
+predictions = model.predict(X)
+print("Predictions:", predictions.flatten())
+# Print the learned weights
+print("Learned weights (w, b):", [layer.get_weights() for layer in model.layers])
+
+4 - RMSPROP(Root Mean Square Propogation)
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import RMSprop
+import numpy as np
+# Generate some sample data
+X = np.array([-1, 0, 1, 2, 3, 4], dtype=float)
+Y = np.array([-3, -1, 1, 3, 5, 7], dtype=float)
+# Create a simple sequential model
+model = Sequential()
+model.add(Dense(1, input_dim=1))
+# Compile the model with the RMSprop optimizer
+# The learning rate can be tuned
+rmsprop = RMSprop(learning_rate=0.1)
+model.compile(loss='mean_squared_error', optimizer=rmsprop)
+# Train the model
+model.fit(X, Y, epochs=100, verbose=0)
+# Make predictions
+predictions = model.predict(X)
+print("Predictions:", predictions.flatten())
+# Print the learned weights
+print("Learned weights (w, b):", [layer.get_weights() for layer in model.layers])
+
+5 - STOCHASTIC GRADIENT DESCENT
+import numpy as np
+# Define the function and its gradients
+def f(x, y):
+    return x**2 + y**2
+def grad_f(x, y):
+    return np.array([2 * x, 2 * y])
+# Parameters
+eta = 0.1  # Learning rate
+epsilon = 1e-8  # Convergence threshold
+x = -0.1659  # Initial x
+y = 0.4406   # Initial y
+bounds = [-1, 1]  # Bounds for x and y
+# Iteration counter
+iteration = 0
+max_iterations = 10000  # Safety limit
+while True:
+    # Compute gradients
+    grad = grad_f(x, y)
+    # Update parameters (SGD update)
+    x -= eta * grad[0]
+    y -= eta * grad[1]
+    # Enforce bounds
+    x = np.clip(x, bounds[0], bounds[1])
+    y = np.clip(y, bounds[0], bounds[1])
+    # Increment iteration
+    iteration += 1
+    # Print progress at each iteration
+    print(f"Iteration {iteration}: x = {x:.8f}, y = {y:.8f}, f(x, y) = {f(x, y):.8f}")
+    # Check convergence
+    if np.linalg.norm(grad) < epsilon or iteration >= max_iterations:
+        break
+# Output results
+print(f"\nFinal x: {x:.8f}, y: {y:.8f}")
+print(f"Function value: {f(x, y):.8f}")
+print(f"Total Iterations: {iteration}")
+
+6 - NEURAL NETWORK AND XOR
+import numpy as np
+# Sigmoid activation function
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+# Derivative of sigmoid
+def sigmoid_derivative(x):
+    return x * (1 - x)
+# Training data (XOR example)
+X = np.array([[0,0],
+              [0,1],
+              [1,0],
+              [1,1]])
+y = np.array([[0],
+              [1],
+              [1],
+              [0]])
+# Seed for reproducibility
+np.random.seed(42)
+# Initialize weights and biases
+input_layer_size = 2
+hidden_layer_size = 4
+output_layer_size = 1
+W1 = np.random.randn(input_layer_size, hidden_layer_size)
+b1 = np.zeros((1, hidden_layer_size))
+W2 = np.random.randn(hidden_layer_size, output_layer_size)
+b2 = np.zeros((1, output_layer_size))
+# Training parameters
+learning_rate = 0.1
+epochs = 10000
+for epoch in range(epochs):
+    # Forward pass
+    z1 = np.dot(X, W1) + b1
+    a1 = sigmoid(z1)
+    z2 = np.dot(a1, W2) + b2
+    a2 = sigmoid(z2)
+    # Loss (mean squared error)
+    loss = np.mean((y - a2) ** 2)
+    # Backpropagation
+    error_output = (a2 - y) * sigmoid_derivative(a2)
+    error_hidden = np.dot(error_output, W2.T) * sigmoid_derivative(a1)
+    # Update weights and biases
+    W2 -= learning_rate * np.dot(a1.T, error_output)
+    b2 -= learning_rate * np.sum(error_output, axis=0, keepdims=True)
+    W1 -= learning_rate * np.dot(X.T, error_hidden)
+    b1 -= learning_rate * np.sum(error_hidden, axis=0, keepdims=True)
+    # Print progress
+    if epoch % 1000 == 0:
+        print(f"Epoch {epoch}, Loss: {loss:.4f}")
+# Test predictions
+print("Predictions:")
+print(a2)
+
+7 - XOR Multilayer backpropagation
+import numpy as np
+# ----- Reproducibility -----
+np.random.seed(42)
+# ----- Data: XOR -----
+# Inputs (x1, x2)
+X = np.array([
+    [0., 0.],
+    [0., 1.],
+    [1., 0.],
+    [1., 1.],
+])  # shape: (4,2)
+# Targets (x1 XOR x2)
+y = np.array([[0.], [1.], [1.], [0.]])  # shape: (4,1)
+# ----- Network topology -----
+n_input  = 2
+n_hidden = 3
+n_output = 1
+# ----- Parameters (weights & biases) -----
+W1 = np.random.randn(n_input,  n_hidden) * 0.5
+b1 = np.zeros((1, n_hidden))
+W2 = np.random.randn(n_hidden, n_output) * 0.5
+b2 = np.zeros((1, n_output))
+# ----- Hyperparameters -----
+lr     = 0.1     # learning rate
+epochs = 10000   # iterations
+print_every = 1000
+# ----- Activations -----
+def sigmoid(z):
+    return 1.0 / (1.0 + np.exp(-z))
+def dsigmoid(a):
+    # derivative wrt pre-activation when provided activation a = sigmoid(z)
+    return a * (1.0 - a)
+# Binary cross-entropy (stable)
+def bce_loss(y_true, y_pred, eps=1e-8):
+    y_pred = np.clip(y_pred, eps, 1 - eps)
+    return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+# ----- Training Loop -----
+for epoch in range(1, epochs + 1):
+    # Forward pass
+    z1 = X @ W1 + b1          # (4,3)
+    a1 = sigmoid(z1)          # hidden
+    z2 = a1 @ W2 + b2         # (4,1)
+    y_hat = sigmoid(z2)       # output
+    # Loss
+    loss = bce_loss(y, y_hat)
+    # Backpropagation
+    # dL/dz2 = (y_hat - y) for BCE + sigmoid output
+    dz2 = (y_hat - y)                        # (4,1)
+    dW2 = a1.T @ dz2 / len(X)                # (3,1)
+    db2 = np.sum(dz2, axis=0, keepdims=True) / len(X)
+    # Hidden layer
+    da1 = dz2 @ W2.T                         # (4,3)
+    dz1 = da1 * dsigmoid(a1)                 # (4,3)
+    dW1 = X.T @ dz1 / len(X)                 # (2,3)
+    db1 = np.sum(dz1, axis=0, keepdims=True) / len(X)
+    # Gradient step
+    W2 -= lr * dW2
+    b2 -= lr * db2
+    W1 -= lr * dW1
+    b1 -= lr * db1
+    if epoch % print_every == 0:
+        preds = (y_hat > 0.5).astype(int)
+        acc = np.mean(preds == y)
+        print(f"Epoch {epoch:5d} | loss={loss:.6f} | acc={acc:.2f}")
+# ----- Final evaluation -----
+z1 = X @ W1 + b1
+a1 = sigmoid(z1)
+z2 = a1 @ W2 + b2
+y_hat = sigmoid(z2)
+preds = (y_hat > 0.5).astype(int)
+print("\nInputs:\n", X)
+print("Targets:\n", y.ravel())
+print("Predicted probs:\n", y_hat.ravel())
+print("Predicted labels:\n", preds.ravel())
+
+
