@@ -1,0 +1,329 @@
+1 - Neural Networks
+Initializers
+Optimizers
+Regularization (With Built-in functions only)
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.initializers import Zeros, Constant, GlorotUniform, HeNormal
+from tensorflow.keras.callbacks import EarlyStopping
+tf.config.run_functions_eagerly(True)
+# Load and preprocess Iris dataset
+iris = load_iris()
+X, y = iris.data, iris.target
+X = StandardScaler().fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+y_train = tf.keras.utils.to_categorical(y_train, num_classes=3)
+y_test = tf.keras.utils.to_categorical(y_test, num_classes=3)
+# Define function to create models
+def create_model(initializer, optimizer, use_regularization=False):
+    model = Sequential()
+    model.add(Dense(16, activation="relu", input_shape=(4,), kernel_initializer=initializer))
+    if use_regularization:
+        model.add(Dropout(0.3))  # Drop neurons randomly
+    model.add(Dense(8, activation="relu", kernel_initializer=initializer))
+    if use_regularization:
+        model.add(Dropout(0.3))
+    model.add(Dense(3, activation="softmax", kernel_initializer=initializer))
+
+    model.compile(optimizer=optimizer,
+                  loss="categorical_crossentropy",
+                  metrics=["accuracy"])
+    return model
+# Initializers & Optimizers to test
+initializers = {
+    "Zeros": Zeros(),
+    "Constant(0.1)": Constant(0.1),
+    "Xavier(Glorot)": GlorotUniform(),
+    "HeNormal": HeNormal()
+}
+optimizers = {
+    "SGD": lambda: tf.keras.optimizers.SGD(learning_rate=0.01),
+    "Momentum": lambda: tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9),
+    "Adagrad": lambda: tf.keras.optimizers.Adagrad(learning_rate=0.01),
+    "Adam": lambda: tf.keras.optimizers.Adam(learning_rate=0.01),
+    "RMSprop": lambda: tf.keras.optimizers.RMSprop(learning_rate=0.01)
+}
+# Run experiments
+results_no_reg, results_reg = {}, {}
+loss_history_no_reg, loss_history_reg = {}, {}
+es = EarlyStopping(patience=5, restore_best_weights=True)
+for init_name, init in initializers.items():
+    for opt_name, opt in optimizers.items():
+        label = f"{init_name} + {opt_name}"
+        # Without regularization
+        model = create_model(init, opt(), use_regularization=False)
+        history = model.fit(X_train, y_train, epochs=50, batch_size=16,
+                            validation_split=0.2, verbose=0, callbacks=[es])
+        _, acc = model.evaluate(X_test, y_test, verbose=0)
+        results_no_reg[label] = acc
+        loss_history_no_reg[label] = history.history
+        # With regularization (Dropout + EarlyStopping)
+        model = create_model(init, opt(), use_regularization=True)
+        history = model.fit(X_train, y_train, epochs=50, batch_size=16,
+                            validation_split=0.2, verbose=0, callbacks=[es])
+        _, acc = model.evaluate(X_test, y_test, verbose=0)
+        results_reg[label] = acc
+        loss_history_reg[label] = history.history
+# -------------------------
+# Plot Accuracy Comparison
+# -------------------------
+plt.figure(figsize=(14,6))
+plt.subplot(1,2,1)
+plt.barh(list(results_no_reg.keys()), list(results_no_reg.values()),
+         color="skyblue", edgecolor="black")
+plt.title("Test Accuracy (Without Regularization)")
+plt.xlabel("Accuracy")
+plt.subplot(1,2,2)
+plt.barh(list(results_reg.keys()), list(results_reg.values()),
+         color="lightgreen", edgecolor="black")
+plt.title("Test Accuracy (With Regularization: Dropout + EarlyStopping)")
+plt.xlabel("Accuracy")
+plt.tight_layout()
+plt.show()
+
+# -------------------------
+# Plot Loss Curves
+# -------------------------
+for label in results_no_reg.keys():
+    plt.figure(figsize=(10,4))
+    # Without regularization
+    plt.subplot(1,2,1)
+    plt.plot(loss_history_no_reg[label]["loss"], label="Train Loss")
+    plt.plot(loss_history_no_reg[label]["val_loss"], label="Val Loss")
+    plt.title(f"Loss (No Reg): {label}")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    # With regularization
+    plt.subplot(1,2,2)
+    plt.plot(loss_history_reg[label]["loss"], label="Train Loss")
+    plt.plot(loss_history_reg[label]["val_loss"], label="Val Loss")
+    plt.title(f"Loss (Reg): {label}")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+2 - Neural Networks
+Initializers
+Optimizers
+Regularization (Manual Implementation)
+
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, precision_score
+import matplotlib.pyplot as plt
+
+# --------------------------
+# Initializers
+# --------------------------
+def init_weights(shape, method="xavier", constant=0.1):
+    if method == "zeros":
+        return np.zeros(shape)
+    elif method == "constant":
+        return np.ones(shape) * constant
+    elif method == "xavier":
+        limit = np.sqrt(6 / (shape[0] + shape[1]))
+        return np.random.uniform(-limit, limit, shape)
+    elif method == "he":
+        stddev = np.sqrt(2 / shape[0])
+        return np.random.randn(*shape) * stddev
+    else:
+        raise ValueError("Unknown initializer")
+
+# --------------------------
+# Optimizers
+# --------------------------
+class SGD:
+    def __init__(self, lr=0.01):
+        self.lr = lr
+    def update(self, w, grad, name="w"):
+        return w - self.lr * grad
+
+class Momentum:
+    def __init__(self, lr=0.01, momentum=0.9):
+        self.lr, self.momentum = lr, momentum
+        self.v = {}
+    def update(self, w, grad, name="w"):
+        if name not in self.v:
+            self.v[name] = np.zeros_like(w)
+        self.v[name] = self.momentum * self.v[name] - self.lr * grad
+        return w + self.v[name]
+
+class Adam:
+    def __init__(self, lr=0.01, beta1=0.9, beta2=0.999, eps=1e-8):
+        self.lr, self.beta1, self.beta2, self.eps = lr, beta1, beta2, eps
+        self.m, self.v, self.t = {}, {}, 0
+    def update(self, w, grad, name="w"):
+        if name not in self.m:
+            self.m[name] = np.zeros_like(w)
+            self.v[name] = np.zeros_like(w)
+        self.t += 1
+        self.m[name] = self.beta1 * self.m[name] + (1 - self.beta1) * grad
+        self.v[name] = self.beta2 * self.v[name] + (1 - self.beta2) * (grad ** 2)
+        m_hat = self.m[name] / (1 - self.beta1 ** self.t)
+        v_hat = self.v[name] / (1 - self.beta2 ** self.t)
+        return w - self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
+
+# --------------------------
+# Manual Neural Network
+# --------------------------
+class SimpleNN:
+    def __init__(self, input_dim, hidden_dim, output_dim,
+                 init="xavier", optimizer=None, dropout_rate=0.0):
+        self.W1 = init_weights((input_dim, hidden_dim), method=init)
+        self.b1 = np.zeros((1, hidden_dim))
+        self.W2 = init_weights((hidden_dim, output_dim), method=init)
+        self.b2 = np.zeros((1, output_dim))
+        self.optimizer = optimizer if optimizer else Adam(lr=0.01)
+        self.dropout_rate = dropout_rate
+
+    def softmax(self, x):
+        exp = np.exp(x - np.max(x, axis=1, keepdims=True))
+        return exp / np.sum(exp, axis=1, keepdims=True)
+
+    def relu(self, x): return np.maximum(0, x)
+    def relu_deriv(self, x): return (x > 0).astype(float)
+
+    def forward(self, X, training=True):
+        self.z1 = X @ self.W1 + self.b1
+        self.a1 = self.relu(self.z1)
+
+        # Dropout
+        if training and self.dropout_rate > 0:
+            self.dropout_mask = (np.random.rand(*self.a1.shape) > self.dropout_rate).astype(float)
+            self.a1 *= self.dropout_mask
+            self.a1 /= (1 - self.dropout_rate)
+        else:
+            self.dropout_mask = np.ones_like(self.a1)
+
+        self.z2 = self.a1 @ self.W2 + self.b2
+        self.a2 = self.softmax(self.z2)
+        return self.a2
+    def backward(self, X, y):
+        m = X.shape[0]
+        error = (self.a2 - y) / m
+        dW2 = self.a1.T @ error
+        db2 = np.sum(error, axis=0, keepdims=True)
+        da1 = error @ self.W2.T
+        dz1 = da1 * self.relu_deriv(self.a1) * self.dropout_mask
+        dW1 = X.T @ dz1
+        db1 = np.sum(dz1, axis=0, keepdims=True)
+        # Update
+        self.W1 = self.optimizer.update(self.W1, dW1, "W1")
+        self.b1 = self.optimizer.update(self.b1, db1, "b1")
+        self.W2 = self.optimizer.update(self.W2, dW2, "W2")
+        self.b2 = self.optimizer.update(self.b2, db2, "b2")
+    def compute_loss(self, y_true, y_pred):
+        return -np.mean(np.sum(y_true * np.log(y_pred + 1e-9), axis=1))
+    def train(self, X_train, y_train, X_val, y_val,
+              epochs=200, patience=None):
+        train_losses, val_losses = [], []
+        best_val_loss, patience_counter = np.inf, 0
+        for epoch in range(epochs):
+            y_pred = self.forward(X_train, training=True)
+            self.backward(X_train, y_train)
+            train_loss = self.compute_loss(y_train, y_pred)
+            y_val_pred = self.forward(X_val, training=False)
+            val_loss = self.compute_loss(y_val, y_val_pred)
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
+            # Early stopping
+            if patience:
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+                if patience_counter >= patience:
+                    break
+        return train_losses, val_losses
+    def predict(self, X):
+        probs = self.forward(X, training=False)
+        return np.argmax(probs, axis=1)
+# --------------------------
+# Data (Iris)
+# --------------------------
+iris = load_iris()
+X, y = iris.data, iris.target
+X = StandardScaler().fit_transform(X)
+y_onehot = np.zeros((y.size, y.max() + 1))
+y_onehot[np.arange(y.size), y] = 1
+X_train, X_val, y_train, y_val = train_test_split(X, y_onehot, test_size=0.2, random_state=42)
+y_val_labels = np.argmax(y_val, axis=1)
+# --------------------------
+# Experiments
+# --------------------------
+optimizers = {
+    "SGD": SGD(lr=0.01),
+    "Momentum": Momentum(lr=0.01),
+    "Adam": Adam(lr=0.01)
+}
+initializers = ["xavier", "he"]
+results = []
+for opt_name, opt in optimizers.items():
+    for init in initializers:
+        # Without Regularization
+        nn_no_reg = SimpleNN(input_dim=4, hidden_dim=8, output_dim=3,
+                             init=init, optimizer=opt, dropout_rate=0.0)
+        train_losses_nr, val_losses_nr = nn_no_reg.train(X_train, y_train, X_val, y_val, epochs=200)
+        y_pred_no_reg = nn_no_reg.predict(X_val)
+        acc_nr = accuracy_score(y_val_labels, y_pred_no_reg)
+        prec_nr = precision_score(y_val_labels, y_pred_no_reg, average="macro")
+        # With Regularization
+        nn_reg = SimpleNN(input_dim=4, hidden_dim=8, output_dim=3,
+                          init=init, optimizer=opt, dropout_rate=0.3)
+        train_losses_r, val_losses_r = nn_reg.train(X_train, y_train, X_val, y_val, epochs=200, patience=15)
+        y_pred_reg = nn_reg.predict(X_val)
+        acc_r = accuracy_score(y_val_labels, y_pred_reg)
+        prec_r = precision_score(y_val_labels, y_pred_reg, average="macro")
+        results.append({
+            "optimizer": opt_name, "init": init,
+            "acc_no_reg": acc_nr, "prec_no_reg": prec_nr,
+            "acc_reg": acc_r, "prec_reg": prec_r,
+            "train_losses_no_reg": train_losses_nr,
+            "val_losses_no_reg": val_losses_nr,
+            "train_losses_reg": train_losses_r,
+            "val_losses_reg": val_losses_r
+        })
+# --------------------------
+# Plot comparisons
+# --------------------------
+for res in results:
+    plt.figure(figsize=(12,4))
+    # Loss curves
+    plt.subplot(1,2,1)
+    plt.plot(res["train_losses_no_reg"], label="Train (No Reg)")
+    plt.plot(res["val_losses_no_reg"], label="Val (No Reg)")
+    plt.plot(res["train_losses_reg"], label="Train (Reg)")
+    plt.plot(res["val_losses_reg"], label="Val (Reg)")
+    plt.title(f"Loss Curves ({res['optimizer']} + {res['init']})")
+    plt.xlabel("Epochs"); plt.ylabel("Loss"); plt.legend()
+    # Accuracy & Precision
+    plt.subplot(1,2,2)
+    labels = ["No Reg", "Reg"]
+    acc_values = [res["acc_no_reg"], res["acc_reg"]]
+    prec_values = [res["prec_no_reg"], res["prec_reg"]]
+    x = np.arange(len(labels)); width = 0.35
+    plt.bar(x - width/2, acc_values, width, label="Accuracy", color="skyblue")
+    plt.bar(x + width/2, prec_values, width, label="Precision", color="lightgreen")
+    plt.xticks(x, labels); plt.ylim(0,1.1)
+    plt.title(f"Acc & Prec ({res['optimizer']} + {res['init']})")
+    plt.legend(loc="upper right")
+    plt.show()
+# Print summary
+for res in results:
+    print(f"{res['optimizer']} + {res['init']} -> "
+          f"No Reg: Acc={res['acc_no_reg']:.3f}, Prec={res['prec_no_reg']:.3f} | "
+          f"Reg: Acc={res['acc_reg']:.3f}, Prec={res['prec_reg']:.3f}")
