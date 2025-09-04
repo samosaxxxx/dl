@@ -299,6 +299,178 @@ print("Targets:\n", y.ravel())
 print("Predicted probs:\n", y_hat.ravel())
 print("Predicted labels:\n", preds.ravel())
 
+8 - XOR MLP — With a Library (PyTorch)
+# pip install torch  # if you don't have it
+import torch
+import torch.nn as nn
+import torch.optim as optim
+# ----- Reproducibility -----
+torch.manual_seed(42)
+# ----- Data: XOR -----
+X = torch.tensor([[0.,0.],[0.,1.],[1.,0.],[1.,1.]], dtype=torch.float32)
+y = torch.tensor([[0.],[1.],[1.],[0.]], dtype=torch.float32)
+# ----- Model -----
+class XORNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(2, 3),
+            nn.Sigmoid(),
+            nn.Linear(3, 1),
+            nn.Sigmoid()
+        )
+    def forward(self, x):
+        return self.net(x)
+model = XORNet()
+# ----- Loss & Optimizer -----
+criterion = nn.BCELoss()
+optimizer = optim.SGD(model.parameters(), lr=0.1)
+# ----- Train -----
+epochs = 5000
+for epoch in range(1, epochs + 1):
+    optimizer.zero_grad()
+    y_hat = model(X)
+    loss = criterion(y_hat, y)
+    loss.backward()
+    optimizer.step()
+    if epoch % 500 == 0:
+        preds = (y_hat.detach() > 0.5).float()
+        acc = (preds == y).float().mean().item()
+        print(f"Epoch {epoch:4d} | loss={loss.item():.6f} | acc={acc:.2f}")
+# ----- Final evaluation -----
+with torch.no_grad():
+    y_hat = model(X)
+    preds = (y_hat > 0.5).int()
+    print("\nInputs:\n", X.numpy())
+    print("Targets:\n", y.numpy().ravel())
+    print("Predicted probs:\n", y_hat.numpy().ravel())
+    print("Predicted labels:\n", preds.numpy().ravel())
+
+8 - Gradient Boosting with a Library (scikit-learn)
+from sklearn.ensemble import GradientBoostingClassifier
+import numpy as np
+X = np.array([[0,0],[0,1],[1,0],[1,1]])
+y = np.array([0,1,1,0])
+gb = GradientBoostingClassifier(
+    n_estimators=10, learning_rate=0.5, max_depth=2  # depth=2
+)
+gb.fit(X, y)
+print("Preds:", gb.predict(X))
+
+9 - Computation Graph
+import numpy as np
+class Node:
+    def __init__(self, value, parents=(), op=""):
+        self.value = np.array(value, dtype=float)
+        self.parents = parents
+        self.op = op
+        self.grad = np.zeros_like(self.value)
+        self._backward = lambda: None
+    def backward(self):
+        topo = []
+        visited = set()
+        def build_topo(node):
+            if node not in visited:
+                visited.add(node)
+                for parent in node.parents:
+                    build_topo(parent)
+                topo.append(node)
+        build_topo(self)
+        self.grad = np.ones_like(self.value)  # seed gradient
+        for node in reversed(topo):
+            node._backward()
+    # --- Operator Overloading ---
+    def __add__(self, other):
+        other = other if isinstance(other, Node) else Node(other)
+        return add(self, other)
+    def __radd__(self, other):
+        return self + other
+    def __mul__(self, other):
+        other = other if isinstance(other, Node) else Node(other)
+        return mul(self, other)
+    def __rmul__(self, other):
+        return self * other
+    def __neg__(self):
+        return self * -1.0
+    def __sub__(self, other):
+        return self + (-other)
+    def __rsub__(self, other):
+        return other + (-self)
+    def __truediv__(self, other):
+        other = other if isinstance(other, Node) else Node(other)
+        return self * (other ** -1)
+    def __pow__(self, power):
+        out = Node(self.value ** power, (self,), op=f"pow({power})")
+        def _backward():
+            self.grad += (power * self.value ** (power - 1)) * out.grad
+        out._backward = _backward
+        return out
+    def __matmul__(self, other):  # matrix multiply
+        other = other if isinstance(other, Node) else Node(other)
+        out = Node(self.value @ other.value, (self, other), op="matmul")
+        def _backward():
+            self.grad += out.grad @ other.value.T
+            other.grad += self.value.T @ out.grad
+        out._backward = _backward
+        return out
+    def __repr__(self):
+        return f"Node(value={self.value}, grad={self.grad}, op={self.op})"
+# --- Functions ---
+def add(a, b):
+    out = Node(a.value + b.value, (a, b), op="add")
+    def _backward():
+        a.grad += out.grad
+        b.grad += out.grad
+    out._backward = _backward
+    return out
+def mul(a, b):
+    out = Node(a.value * b.value, (a, b), op="mul")
+    def _backward():
+        a.grad += b.value * out.grad
+        b.grad += a.value * out.grad
+    out._backward = _backward
+    return out
+def log(a):
+    out = Node(np.log(a.value), (a,), op="log")
+    def _backward():
+        a.grad += (1 / a.value) * out.grad
+    out._backward = _backward
+    return out
+def exp(a):
+    out = Node(np.exp(a.value), (a,), op="exp")
+    def _backward():
+        a.grad += out.value * out.grad
+    out._backward = _backward
+    return out
+def sigmoid(a):
+    val = 1 / (1 + np.exp(-a.value))
+    out = Node(val, (a,), op="sigmoid")
+    def _backward():
+        a.grad += (val * (1 - val)) * out.grad
+    out._backward = _backward
+    return out
+'''#Simple Equation (x+y)*w
+x = Node(2.0)
+y = Node(3.0)
+w = Node(4.0)
+z = mul(add(x, y), w)   # (x+y)*w
+z.backward()
+print("z =", z.value)
+print("dz/dx =", x.grad)  # should be w
+print("dz/dy =", y.grad)  # should be w
+print("dz/dw =", w.grad)  # should be (x+y)'''
+#Logistic Loss
+x = Node(1.0)
+w = Node(2.0)
+y = Node(0.0)
+z = x * w
+y_hat = sigmoid(z)
+loss = -(y * log(y_hat) + (1 - y) * log(1 - y_hat))
+loss.backward()
+print("Loss =", loss.value)
+print("dLoss/dw =", w.grad)
+
+
 
 
 
